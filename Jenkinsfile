@@ -1,29 +1,74 @@
 pipeline {
     agent any
+
     environment {
-        PATH = "/usr/bin:$PATH"
+        NODE_ENV = 'development'
     }
+
     stages {
-        stage('Install Dependencies') {
+        stage('Checkout SCM') {
             steps {
-                sh 'npm install'
+                checkout scm
             }
         }
+
+        stage('Install Dependencies') {
+            steps {
+                script {
+                    // Retry npm install 3 times in case of network issues
+                    retry(3) {
+                        sh 'npm install --fetch-timeout=60000'
+                    }
+                }
+            }
+        }
+
         stage('Run Tests') {
             steps {
                 sh 'npm test'
             }
         }
-        stage('Run Juice Shop') {
+
+        stage('Run Juice Shop Server') {
             steps {
-                sh 'npm start &'
-                sh 'sleep 10'
+                script {
+                    // Start Juice Shop in background
+                    sh 'npm start &'
+                    // Wait for server to start
+                    sh 'sleep 10'
+                }
             }
         }
+
         stage('DAST Scan with OWASP ZAP') {
             steps {
-                sh 'docker run -t owasp/zap2docker-stable zap-baseline.py -t http://localhost:3000'
+                script {
+                    // Run OWASP ZAP baseline scan against local Juice Shop
+                    sh '''
+                    docker run --rm -t owasp/zap2docker-stable zap-baseline.py \
+                    -t http://localhost:3000 \
+                    -r zap_report.html
+                    '''
+                }
             }
+        }
+    }
+
+    post {
+        always {
+            // Stop any background Juice Shop server
+            sh "pkill -f 'node .*app.js' || true"
+
+            // Archive the ZAP report
+            archiveArtifacts artifacts: 'zap_report.html', allowEmptyArchive: true
+
+            echo 'Pipeline finished.'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+        success {
+            echo 'Pipeline succeeded!'
         }
     }
 }
