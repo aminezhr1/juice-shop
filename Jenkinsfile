@@ -17,7 +17,7 @@ pipeline {
                 script {
                     // Retry npm install 3 times in case of network issues
                     retry(3) {
-                        sh 'npm ci --fetch-timeout=60000'
+                        sh 'npm install --fetch-timeout=60000'
                     }
                 }
             }
