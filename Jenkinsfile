@@ -20,8 +20,8 @@ pipeline {
                 script {
                     retry(3) {
                         sh '''
-                        echo "[+] Installing Node dependencies"
-                        npm ci --fetch-timeout=60000
+                        echo "[+] Installing Node dependencies (warnings suppressed)"
+                        npm ci --fetch-timeout=60000 --loglevel=error
                         '''
                     }
                 }
